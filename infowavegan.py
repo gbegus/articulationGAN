@@ -109,7 +109,6 @@ class WaveGANGenerator(torch.nn.Module):
                         stride,
                         use_batchnorm=use_batchnorm
                        )
-        dim_mul //= 2
 
     def forward(self, z):
         # Project and reshape
