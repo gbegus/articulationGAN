@@ -11,8 +11,10 @@ class UpConv(torch.nn.Module):
         stride=4,
         padding='zeros',
         upsample='zeros',
+        relu=True,
         use_batchnorm=False
     ):
+        self.relu = relu
         super(UpConv, self).__init__()
         self.conv = torch.nn.ConvTranspose1d(
                         in_channels=in_channels,
@@ -27,7 +29,7 @@ class UpConv(torch.nn.Module):
     def forward(self, x):
         output = self.conv(x)
         output = self.batch_norm(output)
-        output = F.relu(output)
+        output = F.relu(output) if self.relu else torch.tanh(output)
         return(output)
 
 class DownConv(torch.nn.Module):
@@ -138,7 +140,8 @@ class WaveGANGenerator(torch.nn.Module):
                         nch,
                         kernel_len,
                         stride,
-                        use_batchnorm=use_batchnorm
+                        use_batchnorm=use_batchnorm,
+                        relu=False
                        )
 
     def forward(self, z):
@@ -203,7 +206,6 @@ class WaveGANQNetwork(WaveGANDiscriminator):
                                             phaseshuffle_rad=0
                                         )
             self.fc_out = torch.nn.Linear(dim*16*16, latent_dim)
-
 
 # z = torch.Tensor(np.random.uniform(-1, 1, (25, 100)))
 # G = WaveGANGenerator()
