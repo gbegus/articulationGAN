@@ -189,23 +189,23 @@ class WaveGANDiscriminator(torch.nn.Module):
         return output
 
 class WaveGANQNetwork(WaveGANDiscriminator):
-        def __init__(
-            self,
-            latent_dim,
-            kernel_len=25,
-            dim=64,
-            stride=4,
-            use_batchnorm=False,
-            phaseshuffle_rad=0,
-        ):
-            super(WaveGANQNetwork, self).__init__(
-                                            kernel_len=25,
-                                            dim=64,
-                                            stride=4,
-                                            use_batchnorm=False,
-                                            phaseshuffle_rad=0
-                                        )
-            self.fc_out = torch.nn.Linear(dim*16*16, latent_dim)
+    def __init__(
+        self,
+        num_categ,
+        kernel_len=25,
+        dim=64,
+        stride=4,
+        use_batchnorm=False,
+        phaseshuffle_rad=0,
+    ):
+        super(WaveGANQNetwork, self).__init__(
+                                        kernel_len=25,
+                                        dim=64,
+                                        stride=4,
+                                        use_batchnorm=False,
+                                        phaseshuffle_rad=0
+                                    )
+        self.fc_out = torch.nn.Linear(dim*16*16, num_categ)
 
 # z = torch.Tensor(np.random.uniform(-1, 1, (25, 100)))
 # G = WaveGANGenerator()

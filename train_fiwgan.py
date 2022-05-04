@@ -24,12 +24,13 @@ class AudioDataSet:
             if audio.shape[0] < 16384:
                 audio = np.pad(audio, (0, 16384-audio.shape[0]))
             audio = audio[:16384]
+            audio = audio.astype(np.float32)/32767
             audio /= np.max(np.abs(audio))
             x[i, 0, :] = audio
             i += 1
 
         self.len = len(x)
-        self.audio = torch.from_numpy(np.array(x/32767, dtype=np.float32))
+        self.audio = torch.from_numpy(np.array(x, dtype=np.float32))
 
     def __getitem__(self, index):
         return self.audio[index]
@@ -60,6 +61,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data_dir = "./training/"
     log_dir = './checkpoints/'
+    NUM_CATEG = 2
     WAVEGAN_DISC_NUPDATES = 5
     NUM_EPOCHS = 200
     BATCH_SIZE = 64
@@ -81,10 +83,13 @@ if __name__ == "__main__":
     # Load models
     G = WaveGANGenerator().to(device).train()
     D = WaveGANDiscriminator().to(device).train()
+    Q = WaveGANQNetwork(num_categ=NUM_CATEG).to(device).train()
 
     # Optimizers
     optimizer_G = optim.Adam(G.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
     optimizer_D = optim.Adam(D.parameters(), lr=LEARNING_RATE, betas=(BETA1, BETA2))
+    optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
+    criterion_Q = torch.nn.BCEWithLogitsLoss()
 
     for epoch in range(NUM_EPOCHS):
         print("Epoch {} of {}".format(epoch, NUM_EPOCHS))
@@ -96,7 +101,9 @@ if __name__ == "__main__":
             optimizer_D.zero_grad()
             real = real.to(device)
             epsilon = torch.rand(BATCH_SIZE, 1, 1).repeat(1, 1, 16384).to(device)
-            z = torch.FloatTensor(BATCH_SIZE, 100).uniform_(-1, 1).to(device)
+            _z = torch.FloatTensor(BATCH_SIZE, 100-NUM_CATEG).uniform_(-1, 1).to(device)
+            c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
+            z = torch.cat((c, _z), dim=1)
             fake = G(z)
             penalty = gradient_penalty(G, D, real, fake, epsilon)
 
@@ -104,12 +111,26 @@ if __name__ == "__main__":
             D_loss.backward()
             optimizer_D.step()
 
-            # G Update
             if i % WAVEGAN_DISC_NUPDATES == 0:
                 optimizer_G.zero_grad()
-                z = torch.FloatTensor(BATCH_SIZE, 100).uniform_(-1, 1).to(device)
-                G_loss = torch.mean(-D(G(z)))
-                G_loss.backward()
+                optimizer_Q.zero_grad()
+                _z = torch.FloatTensor(BATCH_SIZE, 100-NUM_CATEG).uniform_(-1, 1).to(device)
+                c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
+                z = torch.cat((c, _z), dim=1)
+                G_z = G(z)
+
+                # G Loss
+                G_loss = torch.mean(-D(G_z))
+                G_loss.backward(retain_graph=True)
+
+                # Q Loss
+                Q_loss = criterion_Q(Q(G_z), c)
+                Q_loss.backward()
+
+                # Update
                 optimizer_G.step()
+                optimizer_Q.step()
+
         torch.save(G.state_dict(), f'./checkpoints/epoch{epoch}_G.pt')
-        torch.save(G.state_dict(), f'./checkpoints/epoch{epoch}_D.pt')
+        torch.save(D.state_dict(), f'./checkpoints/epoch{epoch}_D.pt')
+        torch.save(Q.state_dict(), f'./checkpoints/epoch{epoch}_Q.pt')
