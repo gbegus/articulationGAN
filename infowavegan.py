@@ -9,7 +9,7 @@ class UpConv(torch.nn.Module):
         filters,
         kernel_size=25,
         stride=4,
-        padding='zeros',
+        padding=11,
         upsample='zeros',
         relu=True,
         use_batchnorm=False
@@ -21,7 +21,7 @@ class UpConv(torch.nn.Module):
                         out_channels=filters,
                         kernel_size=(kernel_size),
                         stride=stride,
-                        padding=11,
+                        padding=padding,
                         output_padding=1,
                     )
         self.batch_norm = torch.nn.BatchNorm1d(filters) if use_batchnorm else torch.nn.Identity()
@@ -100,7 +100,8 @@ class WaveGANGenerator(torch.nn.Module):
                         dim * dim_mul * 2,
                         dim * dim_mul,
                         kernel_len,
-                        stride,
+                        stride=4,
+                        padding=11,
                         use_batchnorm=use_batchnorm
                        )
         dim_mul //= 2
@@ -110,36 +111,40 @@ class WaveGANGenerator(torch.nn.Module):
                         dim * dim_mul * 2,
                         dim * dim_mul,
                         kernel_len,
-                        stride,
+                        stride=4,
+                        padding=11,
                         use_batchnorm=use_batchnorm
                        )
         dim_mul //= 2
 
-        # [256, 256] -> [1024, 128]
+        # [256, 256] -> [512, 128]
         self.upconv2 = UpConv(
                         dim * dim_mul * 2,
                         dim * dim_mul,
                         kernel_len,
-                        stride,
+                        stride=2,
+                        padding=12,
                         use_batchnorm=use_batchnorm
                        )
         dim_mul //= 2
 
-        # [1024, 128] -> [4096, 64]
+        # [512, 128] -> [1024, 64]
         self.upconv3 = UpConv(
                         dim * dim_mul * 2,
                         dim * dim_mul,
                         kernel_len,
-                        stride,
+                        stride=2,
+                        padding=12,
                         use_batchnorm=use_batchnorm
                        )
 
-        # [4096, 64] -> [16384, nch]
+        # [1024, 64] -> [2048, nch]
         self.upconv4 = UpConv(
                         dim * dim_mul,
                         nch,
                         kernel_len,
-                        stride,
+                        stride=2,
+                        padding=12,
                         use_batchnorm=use_batchnorm,
                         relu=False
                        )
@@ -207,10 +212,11 @@ class WaveGANQNetwork(WaveGANDiscriminator):
                                     )
         self.fc_out = torch.nn.Linear(dim*16*16, num_categ)
 
-# z = torch.Tensor(np.random.uniform(-1, 1, (25, 100)))
-# G = WaveGANGenerator()
+z = torch.Tensor(np.random.uniform(-1, 1, (25, 100)))
+G = WaveGANGenerator(nch=13, stride=2)
 # D = WaveGANDiscriminator(phaseshuffle_rad=20)
 # Q = WaveGANQNetwork(latent_dim=10, phaseshuffle_rad=20)
-# G_z = G(z)
+G_z = G(z)
+print(G_z.shape)
 # D_G_z = D(G_z)
 # Q_G_z = Q(G_z)
