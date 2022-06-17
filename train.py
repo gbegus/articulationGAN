@@ -1,4 +1,5 @@
 import argparse
+import yaml
 import os
 import re
 
@@ -8,6 +9,8 @@ import torch.optim as optim
 from scipy.io.wavfile import read
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from articulatory.bin.decode import ar_loop
+from articulatory.utils import load_model
 from tqdm import tqdm
 
 from infowavegan import WaveGANGenerator, WaveGANDiscriminator, WaveGANQNetwork
@@ -60,6 +63,37 @@ def gradient_penalty(G, D, real, fake, epsilon):
     penalty = ((grad_norm - 1) ** 2).unsqueeze(1)
     return penalty
 
+def synthesize(model, x, config):
+    '''
+    Given batch of EMA data and EMA model, synthesizes speech output
+    Args:
+        x: (batch, art_len, num_feats)
+
+    Return:
+        signal: (batch, audio_len)
+    '''
+    batch_size = x.shape[0]
+    params_key = "generator_params"
+    audio_chunk_len = config["batch_max_steps"]
+    in_chunk_len = int(audio_chunk_len/config["hop_size"])
+    past_out_len = config[params_key]["ar_input"]
+
+    # NOTE extra_art not supported
+    ins = [x[:, i:i+in_chunk_len, :] for i in range(0, x.shape[1], in_chunk_len)]
+    prev_samples = torch.zeros((batch_size, config[params_key]["out_channels"], past_out_len), dtype=x.dtype, device=x.device)
+    outs = []
+
+    for cin in ins: # a2w cin (batch_size, in_chunk_len, num_feats)
+        cin = cin.permute(0, 2, 1)  # a2w (batch_size, num_feats, in_chunk_len)
+        cout = model(cin, ar=prev_samples)  # a2w (batch_size, 1, audio_chunk_length)
+        outs.append(cout[:, 0, :])
+        if past_out_len <= audio_chunk_len:
+            prev_samples = cout[:, :, -past_out_len:]
+        else:
+            prev_samples[:, :, :-in_chunk_len] = prev_samples[:, :, in_chunk_len:].clone()
+            prev_samples[:, :, -in_chunk_len:] = cout
+    out = torch.unsqueeze(torch.cat(outs, dim=1), 1)  # w2a (batch_size, seq_len, num_feats)
+    return out
 
 if __name__ == "__main__":
     # Training Arguments
@@ -91,7 +125,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--slice_len',
         type=int,
-        default=16384,
+        default=20480,
         help='Length of training data'
     )
     parser.add_argument(
@@ -133,6 +167,10 @@ if __name__ == "__main__":
 
     # Parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    synthesis_checkpoint_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
+    synthesis_config_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    with open(synthesis_config_path) as f:
+        synthesis_config = yaml.load(f, Loader=yaml.Loader)
     datadir = args.datadir
     logdir = args.logdir
     SLICE_LEN = args.slice_len
@@ -160,7 +198,10 @@ if __name__ == "__main__":
 
 
     def make_new():
-        G = WaveGANGenerator(slice_len=SLICE_LEN, ).to(device).train()
+        G = WaveGANGenerator(nch=40).to(device).train()
+        EMA = load_model(synthesis_checkpoint_path, synthesis_config)
+        EMA.remove_weight_norm()
+        EMA = EMA.eval().to(device)
         D = WaveGANDiscriminator(slice_len=SLICE_LEN).to(device).train()
 
         # Optimizers
@@ -177,11 +218,11 @@ if __name__ == "__main__":
             optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
             criterion_Q = torch.nn.CrossEntropyLoss()
 
-        return G, D, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q
+        return G, D, EMA, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q
 
 
     # Load models
-    G, D, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q = make_new()
+    G, D, EMA, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q = make_new()
     start_epoch = 0
     start_step = 0
 
@@ -231,7 +272,7 @@ if __name__ == "__main__":
             _z = torch.FloatTensor(BATCH_SIZE, 100 - NUM_CATEG).uniform_(-1, 1).to(device)
             c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
             z = torch.cat((c, _z), dim=1)
-            fake = G(z)
+            fake = synthesize(EMA, G(z).permute(0, 2, 1), synthesis_config)
             penalty = gradient_penalty(G, D, real, fake, epsilon)
 
             D_loss = torch.mean(D(fake) - D(real) + LAMBDA * penalty)
@@ -241,12 +282,13 @@ if __name__ == "__main__":
 
             if i % WAVEGAN_DISC_NUPDATES == 0:
                 optimizer_G.zero_grad()
+                EMA.zero_grad()
                 if train_Q:
                     optimizer_Q.zero_grad()
                 _z = torch.FloatTensor(BATCH_SIZE, 100 - NUM_CATEG).uniform_(-1, 1).to(device)
                 c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
                 z = torch.cat((c, _z), dim=1)
-                G_z = G(z)
+                G_z = synthesize(EMA, G(z).permute(0, 2, 1), synthesis_config)
 
                 # G Loss
                 G_loss = torch.mean(-D(G_z))
