@@ -167,8 +167,10 @@ if __name__ == "__main__":
 
     # Parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    synthesis_checkpoint_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
-    synthesis_config_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    # synthesis_checkpoint_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
+    # synthesis_config_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    synthesis_checkpoint_path = "articulatory_checkpoints/k_mocha_train_f8nema_mocha2w_hifi/checkpoint-130000steps.pkl"
+    synthesis_config_path = "articulatory_checkpoints/k_mocha_train_f8nema_mocha2w_hifi/config.yml"
     with open(synthesis_config_path) as f:
         synthesis_config = yaml.load(f, Loader=yaml.Loader)
     datadir = args.datadir
@@ -198,7 +200,7 @@ if __name__ == "__main__":
 
 
     def make_new():
-        G = WaveGANGenerator(nch=40).to(device).train()
+        G = WaveGANGenerator(nch=13).to(device).train()
         EMA = load_model(synthesis_checkpoint_path, synthesis_config)
         EMA.remove_weight_norm()
         EMA = EMA.eval().to(device)
@@ -288,10 +290,13 @@ if __name__ == "__main__":
                 _z = torch.FloatTensor(BATCH_SIZE, 100 - NUM_CATEG).uniform_(-1, 1).to(device)
                 c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
                 z = torch.cat((c, _z), dim=1)
-                G_z = synthesize(EMA, G(z).permute(0, 2, 1), synthesis_config)
+                _G_z = G(z)
+                G_z = synthesize(EMA, _G_z.permute(0, 2, 1), synthesis_config)
 
                 # G Loss
-                G_loss = torch.mean(-D(G_z))
+                G_clone = torch.cat((_G_z[:, :, 1:], torch.zeros(1, 13, 1)), dim=2)
+                G_loss = torch.mean(-D(G_z)) + LAMBDA * torch.mean((G_clone - _G_z)**2)
+
                 G_loss.backward(retain_graph=True)
                 writer.add_scalar('Loss/Generator', G_loss.detach().item(), step)
 
