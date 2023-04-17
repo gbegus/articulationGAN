@@ -9,7 +9,6 @@ import torch.optim as optim
 from scipy.io.wavfile import read
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from articulatory.bin.decode import ar_loop
 from articulatory.utils import load_model
 from tqdm import tqdm
 
@@ -216,7 +215,7 @@ if __name__ == "__main__":
             criterion_Q = torch.nn.BCEWithLogitsLoss()
         elif args.ciw:
             optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
-            criterion_Q = torch.nn.CrossEntropyLoss()
+            criterion_Q = lambda inpt, target: torch.nn.CrossEntropyLoss()(inpt, target.max(dim=1)[1])
 
         return G, D, EMA, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q
 
@@ -270,8 +269,16 @@ if __name__ == "__main__":
             real = real.to(device)
             epsilon = torch.rand(BATCH_SIZE, 1, 1).repeat(1, 1, SLICE_LEN).to(device)
             _z = torch.FloatTensor(BATCH_SIZE, 100 - NUM_CATEG).uniform_(-1, 1).to(device)
-            c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
-            z = torch.cat((c, _z), dim=1)
+            if train_Q:
+                if args.fiw:
+                    c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
+                else:
+                    c = torch.nn.functional.one_hot(torch.randint(0, NUM_CATEG, (BATCH_SIZE,)),
+                                                    num_classes=NUM_CATEG).to(device)
+                z = torch.cat((c, _z), dim=1)
+            else:
+                z = _z
+
             fake = synthesize(EMA, G(z).permute(0, 2, 1), synthesis_config)
             penalty = gradient_penalty(G, D, real, fake, epsilon)
 
@@ -286,8 +293,17 @@ if __name__ == "__main__":
                 if train_Q:
                     optimizer_Q.zero_grad()
                 _z = torch.FloatTensor(BATCH_SIZE, 100 - NUM_CATEG).uniform_(-1, 1).to(device)
-                c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
-                z = torch.cat((c, _z), dim=1)
+
+                if train_Q:
+                    if args.fiw:
+                        c = torch.FloatTensor(BATCH_SIZE, NUM_CATEG).bernoulli_().to(device)
+                    else:
+                        c = torch.nn.functional.one_hot(torch.randint(0, NUM_CATEG, (BATCH_SIZE,)),
+                                                        num_classes=NUM_CATEG).to(device)
+
+                    z = torch.cat((c, _z), dim=1)
+                else:
+                    z = _z
                 G_z = synthesize(EMA, G(z).permute(0, 2, 1), synthesis_config)
 
                 # G Loss
