@@ -9,7 +9,6 @@ import torch.optim as optim
 from scipy.io.wavfile import read
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from articulatory.utils import load_model
 from tqdm import tqdm
 
 from infowavegan import WaveGANGenerator, WaveGANDiscriminator, WaveGANQNetwork
@@ -112,7 +111,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--num_categ',
         type=int,
-        default=1,
+        default=0,
         help='Q-net categories'
     )
     parser.add_argument(
@@ -149,6 +148,13 @@ if __name__ == "__main__":
         help='Save interval in epochs'
     )
 
+    parser.add_argument(
+        '--num_channels',
+        type=int,
+        default=13,
+        help='Size of articulatory generator output'
+    )
+
     # Q-net Arguments
     Q_group = parser.add_mutually_exclusive_group()
     Q_group.add_argument(
@@ -164,10 +170,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
     train_Q = args.ciw or args.fiw
 
+
+    if args.num_channels == 40:
+        from articulatory.utils import load_model
+    elif args.num_channels ==13:
+        from parallel_wavegan.utils import load_model
+
+
     # Parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    synthesis_checkpoint_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
-    synthesis_config_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    if args.num_channels == 40:
+        synthesis_checkpoint_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
+        synthesis_config_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    elif args.num_channels == 13:
+        synthesis_checkpoint_path = "articulatory_checkpoints/k_mocha_train_f8nema_mocha2w_hifi/checkpoint-130000steps.pkl"
+        synthesis_config_path = "articulatory_checkpoints/k_mocha_train_f8nema_mocha2w_hifi/config.yml"
+
     with open(synthesis_config_path) as f:
         synthesis_config = yaml.load(f, Loader=yaml.Loader)
     datadir = args.datadir
@@ -197,7 +215,7 @@ if __name__ == "__main__":
 
 
     def make_new():
-        G = WaveGANGenerator(nch=40).to(device).train()
+        G = WaveGANGenerator(nch=args.num_channels).to(device).train()
         EMA = load_model(synthesis_checkpoint_path, synthesis_config)
         EMA.remove_weight_norm()
         EMA = EMA.eval().to(device)
