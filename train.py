@@ -10,6 +10,7 @@ from scipy.io.wavfile import read
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import itertools as it
 
 from infowavegan import WaveGANGenerator, WaveGANDiscriminator, WaveGANQNetwork
 from utils import get_continuation_fname
@@ -229,10 +230,10 @@ if __name__ == "__main__":
         if train_Q:
             Q = WaveGANQNetwork(slice_len=SLICE_LEN, num_categ=NUM_CATEG).to(device).train()
         if args.fiw:
-            optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
+            optimizer_Q = optim.RMSprop(it.chain(G.parameters(), Q.parameters()), lr=LEARNING_RATE)
             criterion_Q = torch.nn.BCEWithLogitsLoss()
         elif args.ciw:
-            optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
+            optimizer_Q = optim.RMSprop(it.chain(G.parameters(), Q.parameters()), lr=LEARNING_RATE)
             criterion_Q = lambda inpt, target: torch.nn.CrossEntropyLoss()(inpt, target.max(dim=1)[1])
 
         return G, D, EMA, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q
