@@ -356,6 +356,18 @@ if __name__ == "__main__":
                 optimizer_G.step()
             step += 1
 
+        if args.log_audio:
+            for i in range(3):
+                audio = G_z[i,0,:]
+                writer.add_audio(f'Audio/sample{i}', audio, step)
+            
+            articul_np = articul_out.cpu().detach().numpy()
+            for i in range(args.num_channels):
+                articul = articul_np[0,i,:]
+                fig, ax = plt.subplots()
+                ax.plot(range(len(articul)), articul)
+                writer.add_figure(f"Articul/articul{i}", fig, step)
+
         if not epoch % SAVE_INT:
             torch.save(G.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_G.pt'))
             torch.save(D.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_D.pt'))
@@ -367,14 +379,4 @@ if __name__ == "__main__":
             if train_Q:
                 torch.save(optimizer_Q.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_Qopt.pt'))
 
-            if args.log_audio:
-                    for i in range(3):
-                        audio = G_z[i,0,:]
-                        writer.add_audio(f'Audio/sample{i}', audio, step)
-                    
-                    articul_np = articul_out.cpu().detach().numpy()
-                    for i in range(args.num_channels):
-                        articul = articul_np[0,i,:]
-                        fig, ax = plt.subplots()
-                        ax.plot(range(len(articul)), articul)
-                        writer.add_figure(f"Articul/articul{i}", fig, step)
+
