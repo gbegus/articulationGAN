@@ -201,6 +201,7 @@ class WaveGANQNetwork(WaveGANDiscriminator):
     def __init__(
         self,
         num_categ,
+        slice_len,
         kernel_len=25,
         dim=64,
         stride=4,

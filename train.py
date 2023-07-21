@@ -10,6 +10,8 @@ from scipy.io.wavfile import read
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import itertools as it
+import matplotlib.pyplot as plt
 
 from infowavegan import WaveGANGenerator, WaveGANDiscriminator, WaveGANQNetwork
 from utils import get_continuation_fname
@@ -109,6 +111,12 @@ if __name__ == "__main__":
         help='Log/Results Directory'
     )
     parser.add_argument(
+        '--emadir',
+        type=str,
+        required=True,
+        help='EMA Weights Directory'
+    )
+    parser.add_argument(
         '--num_categ',
         type=int,
         default=0,
@@ -155,6 +163,12 @@ if __name__ == "__main__":
         help='Size of articulatory generator output'
     )
 
+    parser.add_argument(
+        '--log_audio',
+        action='store_true',
+        help='Save audio and articulator plots'
+    )
+
     # Q-net Arguments
     Q_group = parser.add_mutually_exclusive_group()
     Q_group.add_argument(
@@ -180,11 +194,11 @@ if __name__ == "__main__":
     # Parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.num_channels == 40:
-        synthesis_checkpoint_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
-        synthesis_config_path = "articulatory_checkpoints/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+        synthesis_checkpoint_path = args.emadir + "/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
+        synthesis_config_path = args.emadir + "/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
     elif args.num_channels == 13:
-        synthesis_checkpoint_path = "articulatory_checkpoints/k_mocha_train_f8nema_mocha2w_hifi/checkpoint-130000steps.pkl"
-        synthesis_config_path = "articulatory_checkpoints/k_mocha_train_f8nema_mocha2w_hifi/config.yml"
+        synthesis_checkpoint_path = args.emadir + "/k_mocha_train_f8nema_mocha2w_hifi/checkpoint-130000steps.pkl"
+        synthesis_config_path = args.emadir + "/k_mocha_train_f8nema_mocha2w_hifi/config.yml"
 
     with open(synthesis_config_path) as f:
         synthesis_config = yaml.load(f, Loader=yaml.Loader)
@@ -229,10 +243,10 @@ if __name__ == "__main__":
         if train_Q:
             Q = WaveGANQNetwork(slice_len=SLICE_LEN, num_categ=NUM_CATEG).to(device).train()
         if args.fiw:
-            optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
+            optimizer_Q = optim.RMSprop(it.chain(G.parameters(), Q.parameters()), lr=LEARNING_RATE)
             criterion_Q = torch.nn.BCEWithLogitsLoss()
         elif args.ciw:
-            optimizer_Q = optim.RMSprop(Q.parameters(), lr=LEARNING_RATE)
+            optimizer_Q = optim.RMSprop(it.chain(G.parameters(), Q.parameters()), lr=LEARNING_RATE)
             criterion_Q = lambda inpt, target: torch.nn.CrossEntropyLoss()(inpt, target.max(dim=1)[1])
 
         return G, D, EMA, optimizer_G, optimizer_D, Q, optimizer_Q, criterion_Q
@@ -322,7 +336,9 @@ if __name__ == "__main__":
                     z = torch.cat((c, _z), dim=1)
                 else:
                     z = _z
-                G_z = synthesize(EMA, G(z).permute(0, 2, 1), synthesis_config)
+                
+                articul_out = G(z)
+                G_z = synthesize(EMA, articul_out.permute(0, 2, 1), synthesis_config)
 
                 # G Loss
                 G_loss = torch.mean(-D(G_z))
@@ -340,6 +356,18 @@ if __name__ == "__main__":
                 optimizer_G.step()
             step += 1
 
+        if args.log_audio:
+            for i in range(3):
+                audio = G_z[i,0,:]
+                writer.add_audio(f'Audio/sample{i}', audio, step)
+            
+            articul_np = articul_out.cpu().detach().numpy()
+            for i in range(args.num_channels):
+                articul = articul_np[0,i,:]
+                fig, ax = plt.subplots()
+                ax.plot(range(len(articul)), articul)
+                writer.add_figure(f"Articul/articul{i}", fig, step)
+
         if not epoch % SAVE_INT:
             torch.save(G.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_G.pt'))
             torch.save(D.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_D.pt'))
@@ -350,3 +378,5 @@ if __name__ == "__main__":
             torch.save(optimizer_D.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_Dopt.pt'))
             if train_Q:
                 torch.save(optimizer_Q.state_dict(), os.path.join(logdir, f'epoch{epoch}_step{step}_Qopt.pt'))
+
+
