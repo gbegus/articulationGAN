@@ -367,7 +367,7 @@ if __name__ == "__main__":
         if args.log_audio:
             for i in range(3):
                 audio = G_z[i,0,:]
-                writer.add_audio(f'Audio/sample{i}', audio, step, sampling_rate=16000)
+                writer.add_audio(f'Audio/sample{i}', audio, step, sample_rate=16000)
             
             articul_np = articul_out.cpu().detach().numpy()
             for i in range(args.num_channels):
