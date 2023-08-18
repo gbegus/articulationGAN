@@ -194,10 +194,8 @@ if __name__ == "__main__":
     assert args.kernel_len % 2 == 1, f"generator kernel length must be odd, got: {args.kernel_len}"
     
 
-    if args.num_channels == 40:
-        from articulatory.utils import load_model
-    elif args.num_channels ==13:
-        from parallel_wavegan.utils import load_model
+    from articulatory.utils import load_model
+
 
 
     # Parameters
