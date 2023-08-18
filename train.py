@@ -202,12 +202,12 @@ if __name__ == "__main__":
 
     # Parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if args.num_channels == 40:
-        synthesis_checkpoint_path = args.emadir + "/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
-        synthesis_config_path = args.emadir + "/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    if args.num_channels == 12:
+        synthesis_checkpoint_path = args.emadir + "/mngu0_fema2w_12ch/best_mel_ckpt.pkl"
+        synthesis_config_path = args.emadir + "/mngu0_fema2w_12ch/config.yml"
     elif args.num_channels == 13:
-        synthesis_checkpoint_path = args.emadir + "/k_mocha_train_f8nema_mocha2w_hifi/checkpoint-130000steps.pkl"
-        synthesis_config_path = args.emadir + "/k_mocha_train_f8nema_mocha2w_hifi/config.yml"
+        synthesis_checkpoint_path = args.emadir + "/mngu0_fema2w_13ch/best_mel_ckpt.pkl"
+        synthesis_config_path = args.emadir + "/mngu0_fema2w_13ch/config.yml"
 
     with open(synthesis_config_path) as f:
         synthesis_config = yaml.load(f, Loader=yaml.Loader)
