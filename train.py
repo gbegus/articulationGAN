@@ -169,6 +169,13 @@ if __name__ == "__main__":
         help='Save audio and articulator plots'
     )
 
+    parser.add_argument(
+        '--kernel_len',
+        type=int,
+        default=7,
+        help='Sets the generator kernel length, must be odd'
+    )
+
     # Q-net Arguments
     Q_group = parser.add_mutually_exclusive_group()
     Q_group.add_argument(
@@ -183,7 +190,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     train_Q = args.ciw or args.fiw
-
+    
+    assert args.kernel_len % 2 == 1, f"generator kernel length must be odd, got: {args.kernel_len}"
+    
 
     if args.num_channels == 40:
         from articulatory.utils import load_model
@@ -229,7 +238,7 @@ if __name__ == "__main__":
 
 
     def make_new():
-        G = WaveGANGenerator(nch=args.num_channels).to(device).train()
+        G = WaveGANGenerator(nch=args.num_channels, kernel_len=args.kernel_len, padding_len=(args.kernel_len - 1)/2, use_batchnorm=False).to(device).train()
         EMA = load_model(synthesis_checkpoint_path, synthesis_config)
         EMA.remove_weight_norm()
         EMA = EMA.eval().to(device)
