@@ -18,5 +18,4 @@ soundfile==0.12.1
 tensorboard==2.14.0
 torch==2.0.1
 torch_complex==0.4.3
-tqdm==4.64.1
-warpctc_pytorch==0.2.1
+tqdm
