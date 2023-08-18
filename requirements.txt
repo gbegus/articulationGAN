@@ -1,9 +1,7 @@
 chainer==7.8.1
 editdistance==0.6.2
-espnet==202304
 filelock==3.12.2
 gdown==4.7.1
-gtn==0.0.1
 h5py==3.9.0
 kaldiio==2.18.0
 librosa==0.10.0.post2
@@ -17,5 +15,4 @@ six==1.16.0
 soundfile==0.12.1
 tensorboard==2.14.0
 torch==2.0.1
-torch_complex==0.4.3
 tqdm
