@@ -236,7 +236,8 @@ if __name__ == "__main__":
 
 
     def make_new():
-        G = WaveGANGenerator(nch=args.num_channels, kernel_len=args.kernel_len, padding_len=(args.kernel_len - 1)/2, use_batchnorm=False).to(device).train()
+        padding_len = (int)((args.kernel_len - 1)/2)
+        G = WaveGANGenerator(nch=args.num_channels, kernel_len=args.kernel_len, padding_len=padding_len, use_batchnorm=False).to(device).train()
         EMA = load_model(synthesis_checkpoint_path, synthesis_config)
         EMA.remove_weight_norm()
         EMA = EMA.eval().to(device)
