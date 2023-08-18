@@ -169,6 +169,13 @@ if __name__ == "__main__":
         help='Save audio and articulator plots'
     )
 
+    parser.add_argument(
+        '--kernel_len',
+        type=int,
+        default=7,
+        help='Sets the generator kernel length, must be odd'
+    )
+
     # Q-net Arguments
     Q_group = parser.add_mutually_exclusive_group()
     Q_group.add_argument(
@@ -184,21 +191,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
     train_Q = args.ciw or args.fiw
 
+    assert args.kernel_len % 2 == 1, f"generator kernel length must be odd, got: {args.kernel_len}"
+    
 
-    if args.num_channels == 40:
-        from articulatory.utils import load_model
-    elif args.num_channels ==13:
-        from parallel_wavegan.utils import load_model
+    from articulatory.utils import load_model
+
 
 
     # Parameters
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if args.num_channels == 40:
-        synthesis_checkpoint_path = args.emadir + "/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/best_mel_ckpt.pkl"
-        synthesis_config_path = args.emadir + "/mocha_train_lcdx0pmf8nema_mocha2w_hifi_lcdx0pm/config.yml"
+    if args.num_channels == 12:
+        synthesis_checkpoint_path = args.emadir + "/mngu0_fema2w_12ch/best_mel_ckpt.pkl"
+        synthesis_config_path = args.emadir + "/mngu0_fema2w_12ch/config.yml"
     elif args.num_channels == 13:
-        synthesis_checkpoint_path = args.emadir + "/k_mocha_train_f8nema_mocha2w_hifi/checkpoint-130000steps.pkl"
-        synthesis_config_path = args.emadir + "/k_mocha_train_f8nema_mocha2w_hifi/config.yml"
+        synthesis_checkpoint_path = args.emadir + "/mngu0_fema2w_13ch/best_mel_ckpt.pkl"
+        synthesis_config_path = args.emadir + "/mngu0_fema2w_13ch/config.yml"
 
     with open(synthesis_config_path) as f:
         synthesis_config = yaml.load(f, Loader=yaml.Loader)
@@ -229,7 +236,8 @@ if __name__ == "__main__":
 
 
     def make_new():
-        G = WaveGANGenerator(nch=args.num_channels).to(device).train()
+        padding_len = (int)((args.kernel_len - 1)/2)
+        G = WaveGANGenerator(nch=args.num_channels, kernel_len=args.kernel_len, padding_len=padding_len, use_batchnorm=False).to(device).train()
         EMA = load_model(synthesis_checkpoint_path, synthesis_config)
         EMA.remove_weight_norm()
         EMA = EMA.eval().to(device)
@@ -359,7 +367,7 @@ if __name__ == "__main__":
         if args.log_audio:
             for i in range(3):
                 audio = G_z[i,0,:]
-                writer.add_audio(f'Audio/sample{i}', audio, step)
+                writer.add_audio(f'Audio/sample{i}', audio, step, sample_rate=16000)
             
             articul_np = articul_out.cpu().detach().numpy()
             for i in range(args.num_channels):

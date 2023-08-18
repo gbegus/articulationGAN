@@ -39,7 +39,7 @@ from articulatory.losses import FeatureMatchLoss
 from articulatory.losses import GeneratorAdversarialLoss
 from articulatory.losses import MelSpectrogramLoss
 from articulatory.losses import MultiResolutionSTFTLoss
-from articulatory.losses import InterLoss
+# from articulatory.losses import InterLoss
 from articulatory.utils import read_hdf5
 
 # set to avoid matplotlib error in CLI environment
@@ -1759,9 +1759,10 @@ def main():
     else:
         config["use_mel_loss"] = False
     if config.get("use_inter_loss", False):  # keep compatibility
-        criterion["inter"] = InterLoss(
-            **config["inter_loss_params"],
-        ).to(device)
+        pass
+        # criterion["inter"] = InterLoss(
+        #     **config["inter_loss_params"],
+        # ).to(device)
     else:
         config["use_inter_loss"] = False
     if config["generator_params"].get("use_ph_loss", False):  # keep compatibility

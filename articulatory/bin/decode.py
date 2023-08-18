@@ -32,7 +32,7 @@ def ar_loop(model, x, config, do_wsola=False, modality=None, generator2=False):
     '''
     Args:
         x: (art_len, num_feats)
-
+    
     Return:
         signal: (audio_len,)
     '''
@@ -52,14 +52,13 @@ def ar_loop(model, x, config, do_wsola=False, modality=None, generator2=False):
     if modality is not None:
         scale_factor = config["sampling_rate"]/config["hop_size"]*config["hop_sizes"][modality]/config["sampling_rates"][modality]
     if not do_wsola:
-        print(f"W2A: {w2a}, in_chunk_len: {in_chunk_len}, past_out_len: {past_out_len}, audio_chunk_len: {audio_chunk_len}" )
         # NOTE extra_art not supported
         ins = [x[i:i+in_chunk_len] for i in range(0, len(x), in_chunk_len)]
         if w2a and len(ins[-1]) < config["hop_size"]:
             ins = ins[:-1]
         prev_samples = torch.zeros((1, config[params_key]["out_channels"], past_out_len), dtype=x.dtype, device=x.device)
         outs = []
-
+        
         for cin in ins: # a2w cin (in_chunk_len, num_feats)
             if len(cin.shape) == 1:
                 cin = cin.unsqueeze(1)

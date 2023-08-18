@@ -82,6 +82,7 @@ class WaveGANGenerator(torch.nn.Module):
         dim=64,
         use_batchnorm=False,
         latent_dim=100,
+        padding_len=12,
         upsample='zeros',
         train=False
     ):
@@ -103,7 +104,7 @@ class WaveGANGenerator(torch.nn.Module):
             dim * dim_mul,
             kernel_len,
             stride=2,
-            padding=12,
+            padding=padding_len,
             use_batchnorm=use_batchnorm
         )
 
@@ -113,7 +114,7 @@ class WaveGANGenerator(torch.nn.Module):
             dim * dim_mul,
             kernel_len,
             stride=2,
-            padding=12,
+            padding=padding_len,
             use_batchnorm=use_batchnorm
         )
         dim_mul //= 2
@@ -124,7 +125,7 @@ class WaveGANGenerator(torch.nn.Module):
             dim * dim_mul,
             kernel_len,
             stride=2,
-            padding=12,
+            padding=padding_len,
             use_batchnorm=use_batchnorm
         )
 
@@ -134,7 +135,7 @@ class WaveGANGenerator(torch.nn.Module):
             dim * dim_mul,
             kernel_len,
             stride=1,
-            padding=12,
+            padding=padding_len,
             output_padding=0,
             use_batchnorm=use_batchnorm
 
@@ -146,7 +147,7 @@ class WaveGANGenerator(torch.nn.Module):
             nch,
             kernel_len,
             stride=2,
-            padding=12,
+            padding=padding_len,
             relu=False,
             use_batchnorm=use_batchnorm
         )
@@ -163,6 +164,7 @@ class WaveGANGenerator(torch.nn.Module):
         output = self.upconv3(output)
         output = self.upconv4(output)
         return(output)
+
 
 class WaveGANDiscriminator(torch.nn.Module):
     def __init__(
