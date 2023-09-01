@@ -30,3 +30,16 @@ Here is a list of the possible command line options for training:
 |save_int| Save interval in epochs|
 |batch_size| Batch size| 
 |cont| Provide the epoch number to resume training from a specific checkpoint, or set to "last" to continue from the last available checkpoint.|
+
+## Citation
+
+```@INPROCEEDINGS{10096800,
+  author={Beguš, Gašper and Zhou, Alan and Wu, Peter and Anumanchipalli, Gopala K.},
+  booktitle={ICASSP 2023 - 2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, 
+  title={Articulation GAN: Unsupervised Modeling of Articulatory Learning}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={1-5},
+  doi={10.1109/ICASSP49357.2023.10096800}}
+```
